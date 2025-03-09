@@ -3,11 +3,30 @@ require 'ruby2d'
 set background: 'green'
 set width: 600, height: 600
 
+#PONG_SOUND = Sound.new('')
+#PING_SOUND = Sound.new('')
+
+class DividingLine
+  WIDTH = 15
+  HEIGHT = Window.height
+  NUMBER_OF_LINES = 1
+
+  def draw
+    NUMBER_OF_LINES.times do |i|
+      Rectangle.new(x: (Window.width + WIDTH) / 2, y: (Window.height / NUMBER_OF_LINES) * i, height: HEIGHT, width: WIDTH, color: 'white')
+    end
+  end
+end
+
 class Paddle
   HEIGHT = 150
+  JITTER_CORRECTION = 4
 
   attr_writer :direction
+  attr_reader :side
+  
   def initialize(side, movement_speed)
+    @side = side
     @movement_speed = movement_speed
     @direction = nil
     @y = 200
@@ -38,11 +57,15 @@ class Paddle
   end
   
   def track_ball(ball)
-    if ball.y_middle > y_middle
+    if ball.y_middle > y_middle + JITTER_CORRECTION
       @y += @movement_speed
-    elsif ball.y_middle < y_middle
+    elsif ball.y_middle < y_middle - JITTER_CORRECTION
       @y -= @movement_speed
     end
+  end
+
+  def y1
+    @shape.y1
   end
 
   private
@@ -66,6 +89,7 @@ class Ball
   def initialize(speed)
     @x = 500
     @y = 450
+    @speed = speed
     @y_velocity = speed
     @x_velocity = -speed
   end
@@ -73,8 +97,10 @@ class Ball
   def move
     if hit_bottom?
       @y_velocity = -@y_velocity
+      #PONG_SOUND.play
     elsif hit_top?
       @y_velocity = -@y_velocity
+      #PONG_SOUND.play
     end
     
     @x = @x + @x_velocity
@@ -85,8 +111,22 @@ class Ball
     @shape = Square.new(x: @x, y: @y, size: HEIGHT, color: 'yellow')
   end
 
-  def bounce
-    @x_velocity = -@x_velocity
+  def bounce_off(paddle)
+    if @last_hit_side != paddle.side
+      position = ((@shape.y1 - paddle.y1) / Paddle::HEIGHT.to_f)
+      angle = position.clamp(0.2, 0.8) * Math::PI
+
+      if paddle.side == :left
+        @x_velocity = Math.sin(angle) * @speed
+        @y_velocity = -Math.cos(angle) * @speed
+      else
+        @x_velocity = -Math.sin(angle) * @speed
+        @y_velocity = Math.cos(angle) * @speed
+      end
+
+
+      @last_hit_side =paddle.side
+    end
   end
 
   def y_middle
@@ -108,22 +148,29 @@ class Ball
   end
 end
 
-ball_velocity = 8
+ball_velocity = 8 #snabbhet på bollen
 
-player1 = Paddle.new(:left, 8)
-player2 = Paddle.new(:right, 3)
+player1 = Paddle.new(:left, 7) #ändra hastighet för spelare 1
+player2 = Paddle.new(:right, 7) #hast för spelare 2
 ball = Ball.new(ball_velocity)
 
+#music = Music.new('') #ladda ner musik
+#music.loop = true
+#music.play
 
 update do
   clear 
 
+  DividingLine.new.draw
+  
   if player1.hit_ball?(ball)
-    ball.bounce
+    ball.bounce_off(player1)
+    #PING_SOUND.play
   end
 
   if player2.hit_ball?(ball)
-    ball.bounce
+    ball.bounce_off(player2)
+    #PING_SOUND.play
   end
 
   player1.move
@@ -141,7 +188,7 @@ update do
   end
 end
 
-on :key_down do |event| #spelare 1
+on :key_held do |event| #spelare 1
   if event.key == 'w'
     player1.direction = :up
   elsif event.key == 's'
@@ -149,7 +196,7 @@ on :key_down do |event| #spelare 1
   end
 end
 
-on :key_down do |event| #spelare 2
+on :key_held do |event| #spelare 2
   if event.key == 'up'
     player2.direction = :up
   elsif event.key == 'down'
