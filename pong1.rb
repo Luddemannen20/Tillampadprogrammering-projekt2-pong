@@ -18,6 +18,28 @@ class DividingLine
   end
 end
 
+class Scoreboard
+  attr_reader :left_score, :right_score
+
+  def initialize
+    @left_score = 0
+    @right_score = 0
+  end
+
+  def update(ball)
+  if ball.x <= 0
+    @right_score += 1
+  elsif ball.shape.x2 >= Window.width
+    @left_score += 1
+  end
+end
+
+  def draw
+      Text.new("Left: #{@left_score}", x: 20, y: 20, size: 20, color: ('white'))
+      Text.new("Right: #{@right_score}", x: Window.width - 120, y: 20, size: 20, color: ('white'))
+  end
+end
+
 class Paddle
   HEIGHT = 150
   JITTER_CORRECTION = 4
@@ -84,7 +106,7 @@ end
 class Ball
   HEIGHT = 25
 
-  attr_reader :shape
+  attr_reader :shape, :x, :y
 
   def initialize(speed)
     @x = 500
@@ -153,6 +175,7 @@ ball_velocity = 8 #snabbhet på bollen
 player1 = Paddle.new(:left, 7) #ändra hastighet för spelare 1
 player2 = Paddle.new(:right, 7) #hast för spelare 2
 ball = Ball.new(ball_velocity)
+scoreboard = Scoreboard.new
 
 #music = Music.new('') #ladda ner musik
 #music.loop = true
@@ -184,8 +207,10 @@ update do
   ball.draw
 
   if ball.out_of_bounds?
+    scoreboard.update(ball)
     ball = Ball.new(ball_velocity)
   end
+  scoreboard.draw
 end
 
 on :key_held do |event| #spelare 1
