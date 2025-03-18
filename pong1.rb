@@ -1,22 +1,22 @@
 require 'ruby2d'
 
-set background: 'green'
+image = Image.new('img/background.jpg', width: 600, height: 600)
 set width: 600, height: 600
 
 #PONG_SOUND = Sound.new('')
 #PING_SOUND = Sound.new('')
 
-class DividingLine
-  WIDTH = 15
-  HEIGHT = Window.height
-  NUMBER_OF_LINES = 1
+#class DividingLine
+ # WIDTH = 15
+ # HEIGHT = Window.height
+ # NUMBER_OF_LINES = 1
 
-  def draw
-    NUMBER_OF_LINES.times do |i|
-      Rectangle.new(x: (Window.width + WIDTH) / 2, y: (Window.height / NUMBER_OF_LINES) * i, height: HEIGHT, width: WIDTH, color: 'white')
-    end
-  end
-end
+  #def draw
+   # NUMBER_OF_LINES.times do |i|
+   #   Rectangle.new(x: (Window.width + WIDTH) / 2, y: (Window.height / NUMBER_OF_LINES) * i, height: HEIGHT, width: WIDTH, color: 'white')
+  #  end
+ # end
+#end
 
 class Scoreboard
   attr_reader :left_score, :right_score
@@ -130,7 +130,7 @@ class Ball
   end
 
   def draw
-    @shape = Square.new(x: @x, y: @y, size: HEIGHT, color: 'yellow')
+    @shape = Square.new(x: @x, y: @y, size: HEIGHT, color: 'orange')
   end
 
   def bounce_off(paddle)
@@ -170,10 +170,10 @@ class Ball
   end
 end
 
-ball_velocity = 8 #snabbhet på bollen
+ball_velocity = 10 #snabbhet på bollen
 
-player1 = Paddle.new(:left, 7) #ändra hastighet för spelare 1
-player2 = Paddle.new(:right, 7) #hast för spelare 2
+player1 = Paddle.new(:left, 10) #ändra hastighet för spelare 1
+player2 = Paddle.new(:right, 10) #hast för spelare 2
 ball = Ball.new(ball_velocity)
 scoreboard = Scoreboard.new
 
@@ -184,7 +184,9 @@ scoreboard = Scoreboard.new
 update do
   clear 
 
-  DividingLine.new.draw
+  image.draw
+  
+  #DividingLine.new.draw
   
   if player1.hit_ball?(ball)
     ball.bounce_off(player1)
@@ -201,7 +203,7 @@ update do
 
   player2.draw
   player2.move
-  #player2.track_ball(ball) #ai motståndare
+  player2.track_ball(ball) #ai motståndare
 
   ball.move
   ball.draw
