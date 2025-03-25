@@ -27,16 +27,16 @@ class Scoreboard
   end
 
   def update(ball)
-  if ball.x <= 0
-    @right_score += 1
-  elsif ball.shape.x2 >= Window.width
-    @left_score += 1
+    if ball.x <= 0
+      @right_score += 1
+    elsif ball.shape.x2 >= Window.width
+      @left_score += 1
+    end
   end
-end
 
   def draw
-      Text.new("Left: #{@left_score}", x: 20, y: 20, size: 20, color: ('white'))
-      Text.new("Right: #{@right_score}", x: Window.width - 120, y: 20, size: 20, color: ('white'))
+    Text.new("Left: #{@left_score}", x: 20, y: 20, size: 20, color: 'white')
+    Text.new("Right: #{@right_score}", x: Window.width - 120, y: 20, size: 20, color: 'white')
   end
 end
 
@@ -72,8 +72,10 @@ class Paddle
   end
 
   def hit_ball?(ball)
-    ball.shape && [[ball.shape.x1, ball.shape.y1], [ball.shape.x2, ball.shape.y2], 
-    [ball.shape.x3, ball.shape.y3], [ball.shape.x4, ball.shape.y4]].any? do |coordinates|
+    ball.shape && [[ball.shape.x1, ball.shape.y1],
+                    [ball.shape.x2, ball.shape.y2],
+                    [ball.shape.x3, ball.shape.y3],
+                    [ball.shape.x4, ball.shape.y4]].any? do |coordinates|
       @shape.contains?(coordinates[0], coordinates[1])
     end
   end
@@ -96,8 +98,6 @@ class Paddle
     @y + (HEIGHT / 2)
   end
 
-  private
-
   def max_y
     Window.height - HEIGHT
   end
@@ -108,12 +108,21 @@ class Ball
 
   attr_reader :shape, :x, :y
 
-  def initialize(speed)
-    @x = 500
-    @y = 450
+  def initialize(speed, serve = nil)
     @speed = speed
-    @y_velocity = speed
-    @x_velocity = -speed
+    if serve == :left
+      @x = 60
+      @x_velocity = speed
+    elsif serve == :right
+      @x = Window.width - 60 - HEIGHT
+      @x_velocity = -speed 
+    else
+      @x = Window.width / 2
+      @x_velocity = [-speed, speed].sample
+    end
+    @y = Window.height / 2
+    @y_velocity = 0
+    @last_hit_side = nil
   end
 
   def move
@@ -125,8 +134,8 @@ class Ball
       #PONG_SOUND.play
     end
     
-    @x = @x + @x_velocity
-    @y = @y + @y_velocity
+    @x += @x_velocity
+    @y += @y_velocity
   end
 
   def draw
@@ -146,8 +155,7 @@ class Ball
         @y_velocity = Math.cos(angle) * @speed
       end
 
-
-      @last_hit_side =paddle.side
+      @last_hit_side = paddle.side
     end
   end
 
@@ -170,23 +178,56 @@ class Ball
   end
 end
 
-ball_velocity = 10 #snabbhet på bollen
+ball_velocity = 10 # Bollens hastighet
 
-player1 = Paddle.new(:left, 10) #ändra hastighet för spelare 1
-player2 = Paddle.new(:right, 10) #hast för spelare 2
-ball = Ball.new(ball_velocity)
+player1 = Paddle.new(:left, 10)   # Ändra hastighet för spelare 1
+player2 = Paddle.new(:right, 10)  # Ändra hastighet för spelare 2
+@serving_player = :left
+ball = Ball.new(ball_velocity, @serving_player)
 scoreboard = Scoreboard.new
 
-#music = Music.new('') #ladda ner musik
-#music.loop = true
-#music.play
+@game_paused = true
+@countdown_time = 3.0
+@last_time = Time.now
+
+def start_countdown
+  @game_paused = true
+  @countdown_time = 3.0
+  @last_time = Time.now
+end
 
 update do
   clear 
 
   image.draw
-  
   #DividingLine.new.draw
+
+  player1.move
+  player1.draw
+  player2.move
+  player2.draw
+
+  scoreboard.draw
+
+  if @game_paused
+    current_time = Time.now
+    elapsed = current_time - @last_time
+    @countdown_time -= elapsed
+    @last_time = current_time
+
+    countdown_display = @countdown_time.ceil
+    Text.new(countdown_display.to_s, x: (Window.width / 2) - 5, y: 2, size: 20, color: 'white')
+    
+    # Visa vem som servar
+    serve_text = @serving_player == :left ? "P1 serve" : "P2 serve"
+    Text.new(serve_text, x: (Window.width / 2) - 35, y: 20, size: 20, color: 'white')
+
+    if @countdown_time <= 0
+      @game_paused = false
+    end
+
+    next
+  end
   
   if player1.hit_ball?(ball)
     ball.bounce_off(player1)
@@ -198,24 +239,24 @@ update do
     #PING_SOUND.play
   end
 
-  player1.move
-  player1.draw
-
-  player2.draw
-  player2.move
-  player2.track_ball(ball) #ai motståndare
-
   ball.move
   ball.draw
 
   if ball.out_of_bounds?
-    scoreboard.update(ball)
-    ball = Ball.new(ball_velocity)
+    if ball.x <= 0
+      scoreboard.update(ball)
+      @serving_player = :right
+    elsif ball.shape.x2 >= Window.width
+      scoreboard.update(ball)
+      @serving_player = :left
+    end
+
+    ball = Ball.new(ball_velocity, @serving_player)
+    start_countdown
   end
-  scoreboard.draw
 end
 
-on :key_held do |event| #spelare 1
+on :key_held do |event| # Spelare 1
   if event.key == 'w'
     player1.direction = :up
   elsif event.key == 's'
@@ -223,7 +264,7 @@ on :key_held do |event| #spelare 1
   end
 end
 
-on :key_held do |event| #spelare 2
+on :key_held do |event| # Spelare 2
   if event.key == 'up'
     player2.direction = :up
   elsif event.key == 'down'
@@ -231,10 +272,9 @@ on :key_held do |event| #spelare 2
   end
 end
 
-on :key_up do |event|
-player1.direction = nil
-player2.direction = nil
+on :key_up do |_event|
+  player1.direction = nil
+  player2.direction = nil
 end
-
 
 show
