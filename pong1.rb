@@ -45,7 +45,7 @@ class Paddle
   JITTER_CORRECTION = 4
 
   attr_writer :direction
-  attr_reader :side
+  attr_reader :side, :y, :x
   
   def initialize(side, movement_speed)
     @side = side
@@ -103,26 +103,38 @@ class Paddle
   end
 end
 
+
+
 class Ball
   HEIGHT = 25
 
   attr_reader :shape, :x, :y
 
-  def initialize(speed, serve = nil)
+  def initialize(speed, serve = nil, spawn_y = nil)
     @speed = speed
+    @serve_side = serve
+    spawn_y ||= Window.height / 2
     if serve == :left
       @x = 60
-      @x_velocity = speed
     elsif serve == :right
       @x = Window.width - 60 - HEIGHT
-      @x_velocity = -speed 
     else
       @x = Window.width / 2
-      @x_velocity = [-speed, speed].sample
     end
-    @y = Window.height / 2
+    @y = spawn_y
     @y_velocity = 0
+    @x_velocity = 0
     @last_hit_side = nil
+  end
+
+  def serve!
+    if @serve_side == :left
+      @x_velocity = @speed
+      @y_velocity = 0
+    elsif @serve_side == :right
+      @x_velocity = -@speed
+      @y_velocity = 0
+    end
   end
 
   def move
@@ -183,8 +195,10 @@ ball_velocity = 10 # Bollens hastighet
 player1 = Paddle.new(:left, 10)   # Ändra hastighet för spelare 1
 player2 = Paddle.new(:right, 10)  # Ändra hastighet för spelare 2
 @serving_player = :left
-ball = Ball.new(ball_velocity, @serving_player)
 scoreboard = Scoreboard.new
+spawn_y = (@serving_player == :left) ? (player1.y + Paddle::HEIGHT / 2 - Ball::HEIGHT / 2) :
+          (player2.y + Paddle::HEIGHT / 2 - Ball::HEIGHT / 2)
+ball = Ball.new(ball_velocity, @serving_player, spawn_y)
 
 @game_paused = true
 @countdown_time = 3.0
@@ -210,20 +224,26 @@ update do
   scoreboard.draw
 
   if @game_paused
+    if @serving_player == :left
+      ball.instance_variable_set(:@x, player1.x + 25)
+      ball.instance_variable_set(:@y, player1.y + Paddle::HEIGHT / 2 - Ball::HEIGHT / 2)
+    else
+      ball.instance_variable_set(:@x, player2.x - Ball::HEIGHT)
+      ball.instance_variable_set(:@y, player2.y + Paddle::HEIGHT / 2 - Ball::HEIGHT / 2)
+    end
+    ball.draw
     current_time = Time.now
     elapsed = current_time - @last_time
-    @countdown_time -= elapsed
+    @countdown_time = [@countdown_time - elapsed, 0].max
     @last_time = current_time
 
     countdown_display = @countdown_time.ceil
     Text.new(countdown_display.to_s, x: (Window.width / 2) - 5, y: 2, size: 20, color: 'white')
     
-    # Visa vem som servar
     serve_text = @serving_player == :left ? "P1 serve" : "P2 serve"
-    Text.new(serve_text, x: (Window.width / 2) - 35, y: 20, size: 20, color: 'white')
+    Text.new(serve_text, x: (Window.width / 2) - 40, y: 20, size: 20, color: 'white')
 
     if @countdown_time <= 0
-      @game_paused = false
     end
 
     next
@@ -251,7 +271,12 @@ update do
       @serving_player = :left
     end
 
-    ball = Ball.new(ball_velocity, @serving_player)
+    spawn_y = if @serving_player == :left
+                player1.y + Paddle::HEIGHT / 2 - Ball::HEIGHT / 2
+              else
+                player2.y + Paddle::HEIGHT / 2 - Ball::HEIGHT / 2
+              end
+    ball = Ball.new(ball_velocity, @serving_player, spawn_y)
     start_countdown
   end
 end
@@ -275,6 +300,13 @@ end
 on :key_up do |_event|
   player1.direction = nil
   player2.direction = nil
+end
+
+on :key_down do |event|
+  if event.key == 'space' && @game_paused && @countdown_time <= 0
+    ball.serve!
+    @game_paused = false
+  end
 end
 
 show
