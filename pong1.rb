@@ -1,6 +1,6 @@
 require 'ruby2d'
 
-# Fönsterinställningar
+#Storlek på skärm
 set width: 600, height: 600
 
 # Bakgrund och ljud
@@ -85,27 +85,41 @@ class Scoreboard
              size: 20,
              color: 'white')
   end
+
+  def reset!
+    @left_score = 0
+    @right_score = 0
+  end
 end
 
 # Paddel
 class Paddle
   HEIGHT = 150
 
-  attr_accessor :direction
+  attr_accessor :direction, :speed_multiplier, :slow_timer
   attr_reader :side, :x, :y, :movement_speed
 
   def initialize(side, speed)
-    @side           = side
-    @movement_speed = speed
-    @x              = side == :left ? 40 : Window.width - 60
-    @y              = (Window.height - HEIGHT) / 2
-    @direction      = nil
+    @side             = side
+    @movement_speed   = speed
+    @x                = side == :left ? 40 : Window.width - 60
+    @y                = (Window.height - HEIGHT) / 2
+    @direction        = nil
+    @speed_multiplier = 1.0
+    @slow_timer       = nil
   end
 
   def move
+    # Återställ hastighet om slow-effekten löpt ut
+    if @slow_timer && Time.now > @slow_timer
+      @speed_multiplier = 1.0
+      @slow_timer = nil
+    end
+
+    speed = @movement_speed * @speed_multiplier
     case @direction
-    when :up   then @y = [@y - @movement_speed, 0].max
-    when :down then @y = [@y + @movement_speed, Window.height - HEIGHT].min
+    when :up   then @y = [@y - speed, 0].max
+    when :down then @y = [@y + speed, Window.height - HEIGHT].min
     end
   end
 
@@ -191,19 +205,34 @@ end
 
 class SuperPower
   SIZE = 25
+  attr_accessor :active
+  attr_reader :shape
 
-  def initialize(x = Window.width / 2 - 12, y = rand(0..Window.height))
+  def initialize(x = Window.width / 2 - SIZE/2, y = rand(0..Window.height - SIZE))
     @x = x
     @y = y
+    @active = true
   end
 
   def draw
-    Square.new(
+    return unless @active
+    @shape = Square.new(
       x: @x,
       y: @y,
       size: SIZE,
       color: 'blue'
     )
+  end
+
+  def hit_by?(ball)
+    return false unless @shape && @active
+    corners = [
+      [ball.shape.x1, ball.shape.y1],
+      [ball.shape.x2, ball.shape.y2],
+      [ball.shape.x2, ball.shape.y1],
+      [ball.shape.x1, ball.shape.y2]
+    ]
+    corners.any? { |px, py| @shape.contains?(px, py) }
   end
 end
 
@@ -212,7 +241,6 @@ player1        = Paddle.new(:left, 10)
 player2        = Paddle.new(:right, 10)
 serving_player = :left
 scoreboard     = Scoreboard.new
-
 spawn_y        = player1.y + Paddle::HEIGHT/2 - Ball::SIZE/2
 ball           = Ball.new(10, serving_player, spawn_y)
 @power_up      = SuperPower.new
@@ -231,6 +259,21 @@ update do
   when :playing
     BACKGROUND.draw
     @power_up.draw
+
+    # Kolla powerup-collision
+    if @power_up.active && ball.shape && @power_up.hit_by?(ball)
+      PING_SOUND.play
+      if ball.last_hit_side == :left
+        target = player2
+      elsif ball.last_hit_side == :right
+        target = player1
+      end
+      if target
+        target.speed_multiplier = 0.5
+        target.slow_timer = Time.now + 3
+      end
+      @power_up.active = false
+    end
 
     [player1, player2].each do |p|
       p.move
